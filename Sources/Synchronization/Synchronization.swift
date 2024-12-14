@@ -5,45 +5,14 @@ import os.lock
 ///
 /// These property wrappers provide different approaches to synchronizing access to values in a concurrent environment.
 /// Each implementation offers different trade-offs between performance, complexity, and usage patterns.
-///
-/// ## Usage
-/// ```swift
-/// class MyClass {
-///     @SynchronizedNSLock public var counter = 0
-///     @SynchronizedQueue public var name = "Initial"
-///     @SynchronizedUnfairLock public var score = 100
-///     @SynchronizedActor public var status = "Active"
-/// }
-/// ```
-///
-/// ## Choosing a Property Wrapper
-///
-/// Each property wrapper provides different benefits and trade-offs:
-///
-/// - ``SynchronizedNSLock``: General-purpose synchronization with good performance
-/// - ``SynchronizedQueue``: Queue-based synchronization with additional queuing capabilities
-/// - ``SynchronizedUnfairLock``: Highest performance for simple synchronization needs
-/// - ``SynchronizedActor``: Modern Swift concurrency integration with async/await
-///
-/// Choose the appropriate wrapper based on your specific needs:
-///
-/// - For maximum performance: ``SynchronizedUnfairLock``
-/// - For queue-based operations: ``SynchronizedQueue``
-/// - For Swift concurrency integration: ``SynchronizedActor``
-/// - For general use: ``SynchronizedNSLock``
 
 // MARK: - Using NSLock
 
-/// A property wrapper that provides thread-safe access to a value using `NSLock`.
+/// A property wrapper that provides thread-safe access to a value using NSLock.
 ///
 /// `SynchronizedNSLock` provides a simple and reliable way to ensure thread-safe access to a value using Foundation's `NSLock`.
-///
-/// ## Usage
-/// ```swift
-/// @SynchronizedNSLock public var counter = 0
-/// ```
 @propertyWrapper
-public struct SynchronizedNSLock<Value> {
+public struct SynchronizedNSLock<Value: Sendable>: Sendable {
     private var value: Value
     private let lock = NSLock()
 
@@ -55,7 +24,7 @@ public struct SynchronizedNSLock<Value> {
 
     /// The synchronized value.
     ///
-    /// Access to this value is automatically synchronized using an `NSLock`.
+    /// Access to this value is automatically synchronized using an NSLock.
     public var wrappedValue: Value {
         get {
             lock.lock()
@@ -72,54 +41,42 @@ public struct SynchronizedNSLock<Value> {
 
 // MARK: - Using DispatchQueue
 
-/// A property wrapper that provides thread-safe access to a value using a serial `DispatchQueue`.
+/// A property wrapper that provides thread-safe access to a value using a serial DispatchQueue.
 ///
 /// `SynchronizedQueue` uses GCD's `DispatchQueue` to provide synchronized access to a value.
-///
-/// ## Usage
-/// ```swift
-/// @SynchronizedQueue public var name = "Initial"
-/// ```
 @propertyWrapper
-public struct SynchronizedQueue<Value> {
-    private var value: Value
-    private let queue = DispatchQueue(label: "com.synchronized.queue")
+public struct SynchronizedQueue<Value: Sendable>: Sendable {
+    private let queue = DispatchQueue(label: "com.synchronized.queue", attributes: .concurrent)
+    private var _value: Value
 
     /// Creates a new synchronized value.
     /// - Parameter wrappedValue: The initial value to store.
     public init(wrappedValue: Value) {
-        self.value = wrappedValue
+        self._value = wrappedValue
     }
 
     /// The synchronized value.
     ///
-    /// Access to this value is automatically synchronized using a serial dispatch queue.
+    /// Access to this value is automatically synchronized using a concurrent dispatch queue with a barrier for writing.
     public var wrappedValue: Value {
         get {
-            queue.sync { value }
+            queue.sync { _value }
         }
         set {
-            queue.sync { value = newValue }
+            queue.sync(flags: .barrier) {
+                _value = newValue
+            }
         }
     }
 }
 
 // MARK: - Using OSUnfairLock (Most Lightweight)
 
-/// A property wrapper that provides high-performance thread-safe access using `os_unfair_lock`.
+/// A property wrapper that provides high-performance thread-safe access using os_unfair_lock.
 ///
 /// `SynchronizedUnfairLock` provides the highest performance synchronization using the lightweight `os_unfair_lock`.
-///
-/// ## Important
-/// This property wrapper is marked as `~Copyable` to prevent implicit copying which could lead to undefined behavior
-/// with the underlying lock.
-///
-/// ## Usage
-/// ```swift
-/// @SynchronizedUnfairLock public var score = 100
-/// ```
 @propertyWrapper
-public struct SynchronizedUnfairLock<Value>: ~Copyable {
+public struct SynchronizedUnfairLock<Value: Sendable>: ~Copyable, @unchecked Sendable {
     private var value: Value
     private let lock: os_unfair_lock_t
 
@@ -133,7 +90,7 @@ public struct SynchronizedUnfairLock<Value>: ~Copyable {
 
     /// The synchronized value.
     ///
-    /// Access to this value is automatically synchronized using an `os_unfair_lock`.
+    /// Access to this value is automatically synchronized using an os_unfair_lock.
     public var wrappedValue: Value {
         get {
             os_unfair_lock_lock(lock)
@@ -158,20 +115,11 @@ public struct SynchronizedUnfairLock<Value>: ~Copyable {
 /// A property wrapper that provides thread-safe access using Swift actors.
 ///
 /// `SynchronizedActor` integrates with Swift's structured concurrency system using actors.
-///
-/// ## Usage
-/// ```swift
-/// @SynchronizedActor public var status = "Active"
-///
-/// // Access requires async context
-/// await $status.get()
-/// await $status.set("Inactive")
-/// ```
 @propertyWrapper
-public struct SynchronizedActor<Value> {
+public struct SynchronizedActor<Value: Sendable>: Sendable {
     /// The actor that provides synchronized storage for the value.
-    public actor Storage {
-        var value: Value
+    public actor Storage: Sendable {
+        public var value: Value
 
         /// Creates a new storage with the given initial value.
         /// - Parameter value: The initial value to store.
@@ -231,4 +179,3 @@ public struct SynchronizedActor<Value> {
         await storage.set(newValue)
     }
 }
-
