@@ -50,3 +50,13 @@ Task {
     let currentStatus = await myClass.$status.get()
     print(currentStatus)
 }
+
+## Choosing a Property Wrapper
+
+Maximum performance: Use **SynchronizedUnfairLock**.
+
+Queue-based operations: Use **SynchronizedQueue**.
+
+Swift concurrency integration: Use **SynchronizedActor**.
+
+General-purpose synchronization: Use **SynchronizedNSLock**.

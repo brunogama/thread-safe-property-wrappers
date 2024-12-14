@@ -9,10 +9,10 @@ import os.lock
 /// ## Usage
 /// ```swift
 /// class MyClass {
-///     @SynchronizedNSLock private var counter = 0
-///     @SynchronizedQueue private var name = "Initial"
-///     @SynchronizedUnfairLock private var score = 100
-///     @SynchronizedActor private var status = "Active"
+///     @SynchronizedNSLock public private(set) var counter = 0
+///     @SynchronizedQueue public private(set) var name = "Initial"
+///     @SynchronizedUnfairLock public private(set) var score = 100
+///     @SynchronizedActor public private(set) var status = "Active"
 /// }
 /// ```
 ///
@@ -40,23 +40,23 @@ import os.lock
 ///
 /// ## Usage
 /// ```swift
-/// @SynchronizedNSLock private var counter = 0
+/// @SynchronizedNSLock public private(set) var counter = 0
 /// ```
 @propertyWrapper
-struct SynchronizedNSLock<Value> {
+public struct SynchronizedNSLock<Value> {
     private var value: Value
     private let lock = NSLock()
 
     /// Creates a new synchronized value.
     /// - Parameter wrappedValue: The initial value to store.
-    init(wrappedValue: Value) {
+    public init(wrappedValue: Value) {
         self.value = wrappedValue
     }
 
     /// The synchronized value.
     ///
     /// Access to this value is automatically synchronized using an NSLock.
-    var wrappedValue: Value {
+    public var wrappedValue: Value {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -78,23 +78,23 @@ struct SynchronizedNSLock<Value> {
 ///
 /// ## Usage
 /// ```swift
-/// @SynchronizedQueue private var name = "Initial"
+/// @SynchronizedQueue public private(set) var name = "Initial"
 /// ```
 @propertyWrapper
-struct SynchronizedQueue<Value> {
+public struct SynchronizedQueue<Value> {
     private var value: Value
     private let queue = DispatchQueue(label: "com.synchronized.queue")
 
     /// Creates a new synchronized value.
     /// - Parameter wrappedValue: The initial value to store.
-    init(wrappedValue: Value) {
+    public init(wrappedValue: Value) {
         self.value = wrappedValue
     }
 
     /// The synchronized value.
     ///
     /// Access to this value is automatically synchronized using a serial dispatch queue.
-    var wrappedValue: Value {
+    public var wrappedValue: Value {
         get {
             queue.sync { value }
         }
@@ -110,22 +110,18 @@ struct SynchronizedQueue<Value> {
 ///
 /// `SynchronizedUnfairLock` provides the highest performance synchronization using the lightweight `os_unfair_lock`.
 ///
-/// ## Important
-/// This property wrapper is marked as `~Copyable` to prevent implicit copying which could lead to undefined behavior
-/// with the underlying lock.
-///
 /// ## Usage
 /// ```swift
-/// @SynchronizedUnfairLock private var score = 100
+/// @SynchronizedUnfairLock public private(set) var score = 100
 /// ```
 @propertyWrapper
-struct SynchronizedUnfairLock<Value>: ~Copyable {
+public struct SynchronizedUnfairLock<Value>: ~Copyable {
     private var value: Value
     private let lock: os_unfair_lock_t
 
     /// Creates a new synchronized value.
     /// - Parameter wrappedValue: The initial value to store.
-    init(wrappedValue: Value) {
+    public init(wrappedValue: Value) {
         self.value = wrappedValue
         self.lock = .allocate(capacity: 1)
         self.lock.initialize(to: os_unfair_lock())
@@ -134,7 +130,7 @@ struct SynchronizedUnfairLock<Value>: ~Copyable {
     /// The synchronized value.
     ///
     /// Access to this value is automatically synchronized using an os_unfair_lock.
-    var wrappedValue: Value {
+    public var wrappedValue: Value {
         get {
             os_unfair_lock_lock(lock)
             defer { os_unfair_lock_unlock(lock) }
@@ -161,73 +157,35 @@ struct SynchronizedUnfairLock<Value>: ~Copyable {
 ///
 /// ## Usage
 /// ```swift
-/// @SynchronizedActor private var status = "Active"
+/// @SynchronizedActor public private(set) var status = "Active"
 ///
 /// // Access requires async context
 /// await $status.get()
 /// await $status.set("Inactive")
 /// ```
 @propertyWrapper
-struct SynchronizedActor<Value> {
+public struct SynchronizedActor<Value> {
     /// The actor that provides synchronized storage for the value.
-    actor Storage {
-        var value: Value
+    public actor Storage {
+        public var value: Value
 
         /// Creates a new storage with the given initial value.
         /// - Parameter value: The initial value to store.
-        init(value: Value) {
+        public init(value: Value) {
             self.value = value
         }
 
         /// Gets the current value.
         /// - Returns: The stored value.
-        func get() -> Value {
+        public func get() -> Value {
             value
         }
 
         /// Sets a new value.
         /// - Parameter newValue: The new value to store.
-        func set(_ newValue: Value) {
+        public func set(_ newValue: Value) {
             value = newValue
         }
     }
 
-    private let storage: Storage
-
-    /// Creates a new synchronized value.
-    /// - Parameter wrappedValue: The initial value to store.
-    init(wrappedValue: Value) {
-        storage = Storage(value: wrappedValue)
-    }
-
-    /// The synchronized value.
-    ///
-    /// Direct access to this value will result in a fatal error. Use the async methods instead.
-    var wrappedValue: Value {
-        fatalError(
-            """
-            SynchronizedActor property wrapper requires async access.
-            Instead of direct access, use:
-                await $propertyName.get()
-                await $propertyName.set(newValue)
-            """
-        )
-    }
-
-    /// The projected value provides access to the underlying actor storage.
-    var projectedValue: Storage {
-        storage
-    }
-
-    /// Gets the current value asynchronously.
-    /// - Returns: The stored value.
-    func get() async -> Value {
-        await storage.get()
-    }
-
-    /// Sets a new value asynchronously.
-    /// - Parameter newValue: The new value to store.
-    func set(_ newValue: Value) async {
-        await storage.set(newValue)
-    }
-}
+    private let storage: Storag
