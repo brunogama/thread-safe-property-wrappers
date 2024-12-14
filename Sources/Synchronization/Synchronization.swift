@@ -9,10 +9,10 @@ import os.lock
 /// ## Usage
 /// ```swift
 /// class MyClass {
-///     @SynchronizedNSLock public private(set) var counter = 0
-///     @SynchronizedQueue public private(set) var name = "Initial"
-///     @SynchronizedUnfairLock public private(set) var score = 100
-///     @SynchronizedActor public private(set) var status = "Active"
+///     @SynchronizedNSLock public var counter = 0
+///     @SynchronizedQueue public var name = "Initial"
+///     @SynchronizedUnfairLock public var score = 100
+///     @SynchronizedActor public var status = "Active"
 /// }
 /// ```
 ///
@@ -34,13 +34,13 @@ import os.lock
 
 // MARK: - Using NSLock
 
-/// A property wrapper that provides thread-safe access to a value using NSLock.
+/// A property wrapper that provides thread-safe access to a value using `NSLock`.
 ///
 /// `SynchronizedNSLock` provides a simple and reliable way to ensure thread-safe access to a value using Foundation's `NSLock`.
 ///
 /// ## Usage
 /// ```swift
-/// @SynchronizedNSLock public private(set) var counter = 0
+/// @SynchronizedNSLock public var counter = 0
 /// ```
 @propertyWrapper
 public struct SynchronizedNSLock<Value> {
@@ -55,7 +55,7 @@ public struct SynchronizedNSLock<Value> {
 
     /// The synchronized value.
     ///
-    /// Access to this value is automatically synchronized using an NSLock.
+    /// Access to this value is automatically synchronized using an `NSLock`.
     public var wrappedValue: Value {
         get {
             lock.lock()
@@ -72,13 +72,13 @@ public struct SynchronizedNSLock<Value> {
 
 // MARK: - Using DispatchQueue
 
-/// A property wrapper that provides thread-safe access to a value using a serial DispatchQueue.
+/// A property wrapper that provides thread-safe access to a value using a serial `DispatchQueue`.
 ///
 /// `SynchronizedQueue` uses GCD's `DispatchQueue` to provide synchronized access to a value.
 ///
 /// ## Usage
 /// ```swift
-/// @SynchronizedQueue public private(set) var name = "Initial"
+/// @SynchronizedQueue public var name = "Initial"
 /// ```
 @propertyWrapper
 public struct SynchronizedQueue<Value> {
@@ -106,13 +106,17 @@ public struct SynchronizedQueue<Value> {
 
 // MARK: - Using OSUnfairLock (Most Lightweight)
 
-/// A property wrapper that provides high-performance thread-safe access using os_unfair_lock.
+/// A property wrapper that provides high-performance thread-safe access using `os_unfair_lock`.
 ///
 /// `SynchronizedUnfairLock` provides the highest performance synchronization using the lightweight `os_unfair_lock`.
 ///
+/// ## Important
+/// This property wrapper is marked as `~Copyable` to prevent implicit copying which could lead to undefined behavior
+/// with the underlying lock.
+///
 /// ## Usage
 /// ```swift
-/// @SynchronizedUnfairLock public private(set) var score = 100
+/// @SynchronizedUnfairLock public var score = 100
 /// ```
 @propertyWrapper
 public struct SynchronizedUnfairLock<Value>: ~Copyable {
@@ -129,7 +133,7 @@ public struct SynchronizedUnfairLock<Value>: ~Copyable {
 
     /// The synchronized value.
     ///
-    /// Access to this value is automatically synchronized using an os_unfair_lock.
+    /// Access to this value is automatically synchronized using an `os_unfair_lock`.
     public var wrappedValue: Value {
         get {
             os_unfair_lock_lock(lock)
@@ -157,7 +161,7 @@ public struct SynchronizedUnfairLock<Value>: ~Copyable {
 ///
 /// ## Usage
 /// ```swift
-/// @SynchronizedActor public private(set) var status = "Active"
+/// @SynchronizedActor public var status = "Active"
 ///
 /// // Access requires async context
 /// await $status.get()
@@ -167,7 +171,7 @@ public struct SynchronizedUnfairLock<Value>: ~Copyable {
 public struct SynchronizedActor<Value> {
     /// The actor that provides synchronized storage for the value.
     public actor Storage {
-        public var value: Value
+        var value: Value
 
         /// Creates a new storage with the given initial value.
         /// - Parameter value: The initial value to store.
@@ -188,4 +192,42 @@ public struct SynchronizedActor<Value> {
         }
     }
 
-    private let storage: Storag
+    private let storage: Storage
+
+    /// Creates a new synchronized value.
+    /// - Parameter wrappedValue: The initial value to store.
+    public init(wrappedValue: Value) {
+        storage = Storage(value: wrappedValue)
+    }
+
+    /// The synchronized value.
+    ///
+    /// Direct access to this value will result in a fatal error. Use the async methods instead.
+    public var wrappedValue: Value {
+        fatalError(
+            """
+            SynchronizedActor property wrapper requires async access.
+            Instead of direct access, use:
+                await $propertyName.get()
+                await $propertyName.set(newValue)
+            """
+        )
+    }
+
+    /// The projected value provides access to the underlying actor storage.
+    public var projectedValue: Storage {
+        storage
+    }
+
+    /// Gets the current value asynchronously.
+    /// - Returns: The stored value.
+    public func get() async -> Value {
+        await storage.get()
+    }
+
+    /// Sets a new value asynchronously.
+    /// - Parameter newValue: The new value to store.
+    public func set(_ newValue: Value) async {
+        await storage.set(newValue)
+    }
+}
