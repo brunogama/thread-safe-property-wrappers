@@ -3,24 +3,24 @@
 
 import PackageDescription
 
+let name = "ThreadsSafePropertyWrappers"
+let version = "1.0.6"
+
 let package = Package(
-    name: "Synchronization",
+    name: name,
     platforms: [.macOS(.v15), .iOS(.v15), .watchOS(.v8), .tvOS(.v15)],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "Synchronization",
-            targets: ["Synchronization"]),
+            name: name,
+            targets: [name]),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "Synchronization"),
-        .testTarget(
-            name: "SynchronizationTests",
-            dependencies: ["Synchronization"]
+            name: name
         ),
-    ],
-    swiftLanguageModes: [.version("5.9")]
+        .testTarget(
+            name: "\(name)Tests",
+            dependencies: [.init(stringLiteral: name)]
+        ),
+    ]
 )

@@ -1,4 +1,4 @@
-# Thread-Safe Property Wrappers in Swift
+# Isolation a Thread-Safea collection of Property Wrappers
 
 A collection of property wrappers that provide thread-safe access to values using different synchronization mechanisms.
 
@@ -8,21 +8,24 @@ These property wrappers allow you to manage thread-safe access to values in a co
 
 ### Available Property Wrappers
 
-1. `SynchronizedNSLock`
+1. `NSLockIsolated`
    - Uses `NSLock` for general-purpose synchronization.
    - Good performance for most use cases.
+   - **Non-recursive** by default.
+   
+2. `LockIsolated`
+    - Synchronizes access using a custom lock.
+    - Provides more control over the synchronization mechanism.
+    - Uses NSRecursiveLock by default.
 
-2. `SynchronizedQueue`
+3. `DispatchQueueIsolated`
    - Synchronizes access using a serial `DispatchQueue`.
    - Ideal for queue-based operations.
 
-3. `SynchronizedUnfairLock`
+4. `UnfairLockIsolated`
    - High-performance synchronization with `os_unfair_lock`.
    - Best for simple and lightweight synchronization needs.
-
-4. `SynchronizedActor`
-   - Integrates with Swift's structured concurrency using `Actor`.
-   - Provides modern async/await capabilities.
+   - **Non-recursive**
 
 ## Usage
 
@@ -30,10 +33,10 @@ Here's an example of how to use these property wrappers:
 
 ```swift
 class MyClass {
-    @SynchronizedNSLock private var counter = 0
-    @SynchronizedQueue private var name = "Initial"
-    @SynchronizedUnfairLock private var score = 100
-    @SynchronizedActor private var status = "Active"
+    @NSLockIsolated private var counter = 0
+    @LockIsolated private var counter = 0
+    @DispatchQueueIsolated private var name = "Initial"
+    @UnfairLockIsolated private var score = 100
 }
 
 // Example usage
@@ -44,19 +47,10 @@ myClass.counter += 1
 myClass.name = "Updated"
 myClass.score += 50
 
-// Using async methods for `SynchronizedActor`
-Task {
-    await myClass.$status.set("Inactive")
-    let currentStatus = await myClass.$status.get()
-    print(currentStatus)
-}
-
 ## Choosing a Property Wrapper
 
-Maximum performance: Use **SynchronizedUnfairLock**.
+Maximum performance: Use **UnfairLockIsolated**.
 
-Queue-based operations: Use **SynchronizedQueue**.
+Queue-based operations: Use **DispatchQueueIsolated**.
 
-Swift concurrency integration: Use **SynchronizedActor**.
-
-General-purpose synchronization: Use **SynchronizedNSLock**.
+General-purpose synchronization: Use **NSLockIsolated** or **LockIsolated**
